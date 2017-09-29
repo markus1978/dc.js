@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>dc.js - Scatter Plot Example</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css" href="../css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="../css/dc.css"/>
+</head>
+<body>
+
+<div class="container">
+<script type="text/javascript" src="header.js"></script>
+<div id="test"></div>
+
+<script type="text/javascript" src="../js/d3.js"></script>
+<script type="text/javascript" src="../js/crossfilter.js"></script>
+<script type="text/javascript" src="../js/dc.js"></script>
+<script type="text/javascript">
+
+var chart = dc.parallelCoordinates("#test");
+d3.csv("monthly-move.csv", function(error, moveData) {
+
+  var ndx = crossfilter(moveData),
+      dimension = ndx.dimension(function(d) {return [d.high, d.volume]; }),
+      group = dimension.group();
+
+  chart
+    .width(768)
+    .height(480)
+    .x(d3.scale.linear().domain([50,4000]))
+    .brushOn(false)
+    .symbolSize(8)
+    .yAxisLabel("This is the Y Axis!")
+    .dimension(dimension)
+    .group(group);
+
+  chart.render();
+
+});
+
+</script>
+
+</div>
+</body>
+</html>
