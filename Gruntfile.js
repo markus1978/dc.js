@@ -479,5 +479,6 @@ module.exports.jsFiles = [
     'src/d3.box.js',
     'src/box-plot.js',
     'src/select-menu.js',
+    'src/parallel-coordinates.js',
     'src/footer.js'  // NOTE: keep this last
 ];
