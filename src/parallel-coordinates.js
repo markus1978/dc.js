@@ -1,9 +1,8 @@
 /**
- * A scatter plot chart
+ * A parallel coordinates chart
  *
  * Examples:
- * - {@link http://dc-js.github.io/dc.js/examples/scatter.html Scatter Chart}
- * - {@link http://dc-js.github.io/dc.js/examples/multi-scatter.html Multi-Scatter Chart}
+ * - {@link http://dc-js.github.io/dc.js/examples/parallel-coordinates.html Scatter Chart}
  * @class parallelCoordinates
  * @memberof dc
  * @mixes dc.coordinateGridMixin
@@ -22,8 +21,199 @@
  * @returns {dc.parallelCoordinates}
  */
 dc.parallelCoordinates = function (parent, chartGroup) {
-    var _chart = dc.coordinateGridMixin({});
+    var _chart = dc.colorMixin(dc.marginMixin(dc.baseMixin({})));
     var _symbol = d3.svg.symbol();
+
+    var _g;
+
+    _chart._doRender = function () {
+        _chart.resetSvg();
+
+        _g = _chart.svg()
+            .append('g')
+            .attr('transform', 'translate(' + _chart.margins().left + ',' + _chart.margins().top + ')');
+
+        drawChart();
+
+        return _chart;
+    };
+
+    function myextent(array, accessor) {
+      var min = 100000;
+      var max = 0;
+      array.forEach(function(datum) {
+        const val = accessor(datum);
+        if (val < min) {
+          min = val;
+        }
+        if (val > max) {
+          max = val;
+        }
+      });
+      return [min, max];
+    }
+
+    function drawChart () {
+        var _data = _chart.data();
+        console.log(_data);
+
+        const dimensions = Array(_data[0].key.length); // this needs to be imporved)
+        for (var i = 0; i < dimensions.length; i++) {
+          dimensions[i] = i;
+        }
+        const dimensionTitles = dimensions.map(function(index) { return "" + index; });
+        const dataAccess = function(datum, dim) { return datum.key[dim]; };
+
+        const width = _chart.width() - (_chart.margins().left + _chart.margins().right);
+        const height = _chart.height() - (_chart.margins().top + _chart.margins().bottom);
+
+        const x = d3.scale.ordinal().domain(dimensions).rangePoints([0, width]);
+        const y = {};
+
+        const line = d3.svg.line();
+        const axis = d3.svg.axis().orient("left");
+
+        var lines = null;
+
+        // Create a scale and brush for each dimension.
+        dimensions.forEach(function(dim) {
+          // this.data.forEach(datum => datum[dim.key] = +datum[dim.key]); // ensure numbers?
+
+          // Calculate domain with 5% extra space
+          const extent = myextent(_data, function(datum) { return dataAccess(datum, dim); });
+
+          // Create the scale
+          y[dim] = d3.scale.linear().domain(extent).range([height, 0]).nice();
+
+          // Create the brush
+          // y[dim.key].brush = d3.svg.brush()
+          //   .y(y[dim.key])
+          //   .on("brush", () => {
+          //     // Handles a brush event, toggling the display of forground lines.
+          //     const actives = this._dimensions.filter(dim => !y[dim.key].brush.empty());
+          //     const extents = actives.map(dim => y[dim.key].brush.extent());
+          //     const selection = [];
+          //     lines.each(datum => {
+          //       const selected = actives.length != 0 && actives.every((dim, i) => extents[i][0] <= datum[dim.key] && datum[dim.key] <= extents[i][1]);
+          //       if (selected) {
+          //         selection.push(datum);
+          //       }
+          //     });
+          //     this.setDirectSelection(selection);
+          //   });
+        });
+
+
+        // Helper function: returns the path for a given data point.
+        const expand = function(datum) {
+          return dimensions.filter(function(dim) {
+            return dataAccess(datum, dim) != 0;
+          }).map(function(dim) {
+            return {
+              dim: dim,
+              value: dataAccess(datum, dim),
+              data: datum
+            };
+          });
+        };
+
+        const path = function(datum) {
+          return line(expand(datum).map(function(expanded) {
+            return [x(expanded.dim), y[expanded.dim](expanded.value)];
+          }));
+        };
+
+        const flatten = function(source) {
+          const result = [];
+          source.forEach(function(d) { d.forEach(function(d) { result.push(d); }); });
+          return result;
+        };
+
+        // Add foreground
+        const foreground = _g.append("svg:g")
+          .attr("class", "foreground");
+        // Add lines
+        const updateLines = function(lines) {
+          lines.attr("d", path);
+        }
+        lines = foreground.selectAll("path")
+          .data(_data)
+          .enter().append("svg:path").style("fill", "none").style("stroke", "black");
+        updateLines(lines);
+
+        // Add dots
+        const updateDots = function(dots) {
+          dots
+            .attr("cx", function(expanded) { return x(expanded.dim); })
+            .attr("cy", function(expanded) { return y[expanded.dim](expanded.value); });
+        }
+        const dots = foreground.selectAll("circle")
+          .data(flatten(_data.map(expand)))
+          .enter().append("svg:circle")
+          .attr("r", 4);
+        updateDots(dots);
+
+        // this.appendTooltip(lines);
+
+        // let i = 0;
+
+        // Add a group element for each dimension.
+        const axisGroups = _g.selectAll(".dimension")
+          .data(dimensions)
+          .enter().append("g")
+          .attr("class", "dimension")
+          .attr("transform", function(d) {
+            return "translate(" + x(d) + ")";
+          });
+          // .call(d3.behavior.drag()
+          //   .origin(d => { return {x: x(d.key)}; })
+          //   .on("dragstart", d => {
+          //     i = this._dimensions.indexOf(d);
+          //   })
+          //   .on("drag", () => {
+          //     x.range()[i] = d3.event.x;
+          //     this._dimensions.sort((a, b) => x(a.key) - x(b.key));
+          //     g.attr("transform", d => "translate(" + x(d.key) + ")");
+          //     updateLines(lines);
+          //     updateDots(dots);
+          //   })
+          //   .on("dragend", () => {
+          //     x.domain(this._dimensions.map(dim => dim.key)).rangePoints([0, w]);
+          //     const t = d3.transition().duration(500);
+          //     t.selectAll(".dimension").attr("transform", dim => "translate(" + x(dim.key) + ")");
+          //     updateLines(t.selectAll(".foreground path"));
+          //     updateDots(t.selectAll(".foreground circle"));
+          //   }));
+
+        // Add an axis and title.
+        const axisSvg = axisGroups.append("svg:g");
+        axisSvg
+          .attr("class", "axis")
+          .each(function(d) { d3.select(this).call(axis.scale(y[d]).ticks(10, "s")); })
+          .append("svg:text").classed("axisTitle", true)
+          .attr("text-anchor", "middle")
+          .attr("y", -9)
+          .text(function(d) { return dimensionTitles[d]; });
+        // this.appendAxis(axisSvg);
+
+        // Add a brush for each axis.
+        // g.append("svg:g")
+        //   .attr("class", "brush")
+        //   .each(function(d) { d3.select(this).call(y[d.key].brush); })
+        //   .selectAll("rect")
+        //   .attr("x", -8)
+        //   .attr("width", 16);
+
+        // drawAxis();
+        // drawGridLines();
+        //
+        // var rows = _g.selectAll('g.' + _rowCssClass)
+        //     .data(_rowData);
+        //
+        // createElements(rows);
+        // removeElements(rows);
+        // updateElements(rows);
+    }
 
     var _existenceAccessor = function (d) { return d.value; };
 

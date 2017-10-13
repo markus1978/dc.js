@@ -19,18 +19,18 @@
 
 var chart = dc.parallelCoordinates("#test");
 d3.csv("monthly-move.csv", function(error, moveData) {
-
+  moveData = moveData.slice(0, 10);
   var ndx = crossfilter(moveData),
-      dimension = ndx.dimension(function(d) {return [d.high, d.volume]; }),
+      dimension = ndx.dimension(function(d) {return [d.open, d.high, d.low, d.close, d.volume]; }),
       group = dimension.group();
 
   chart
     .width(768)
     .height(480)
-    .x(d3.scale.linear().domain([50,4000]))
-    .brushOn(false)
+    //.x(d3.scale.linear().domain([50,4000]))
+    //.brushOn(false)
     .symbolSize(8)
-    .yAxisLabel("This is the Y Axis!")
+    //.yAxisLabel("This is the Y Axis!")
     .dimension(dimension)
     .group(group);
 
